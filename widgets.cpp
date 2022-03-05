@@ -1,0 +1,178 @@
+#include "widgets.hpp"
+#include <imgui.h>
+#include "network.hpp"
+
+
+namespace awe
+{
+    mode_panel::mode_panel()
+    {
+        std::memcpy(m_ip, "127.0.0.1", 10);
+    }
+
+    void mode_panel::set_network(std::shared_ptr<network> ptr)
+    {
+        m_network.swap(ptr);
+        m_status = m_network->get_socket().is_open() ?
+            CONNECTED :
+            NOT_CONNECTED;
+    }
+
+    void ShowModePanel(const char* title, mode_panel& p)
+    {
+        const int flags =
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize;
+        if(ImGui::BeginPopupModal(title, nullptr, flags))
+        {
+            ImGui::Text("Select Your Mode");
+            if(ImGui::BeginTabBar("modes"))
+            {
+                if(ImGui::BeginTabItem("Network Client"))
+                {
+                    p.client_tab();
+                    ImGui::EndTabItem();
+                }
+                if(ImGui::BeginTabItem("Network Server"))
+                {
+                    p.server_tab();
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            }
+            ImGui::EndPopup();
+        }
+    }
+
+    void mode_panel::client_tab()
+    {
+        static int count = 0;
+        count = ++count;
+        auto& io = ImGui::GetIO();
+
+        ImGui::InputText("IP", m_ip, 16);
+        ImGui::InputInt("Port", &m_port);
+        switch(m_status)
+        {
+        case NOT_CONNECTED:
+            if(ImGui::Button("Connect"))
+            {
+                assert(!m_network_result.valid());
+                m_network_result = std::async(
+                    std::launch::async,
+                    [this]()
+                    {
+                        boost::system::error_code ec;
+                        m_network->connect(boost::asio::ip::address_v4::from_string(m_ip), m_port, ec);
+                        return ec;
+                    }
+                );
+                m_status = PENDING;
+            }
+            break;
+        case CONNECTED:
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "Connected");
+            if(ImGui::Button("OK"))
+            {
+                ImGui::CloseCurrentPopup();
+            }
+            break;
+        case PENDING:
+            using namespace std;
+            ImGui::Text("%c Pending", "-\\|/"[(count / 10) % 4]);
+            if(m_network_result.wait_for(10ns) == future_status::ready)
+            {
+                m_ec = m_network_result.get();
+                m_status = m_ec ? CONNECTION_ERROR : CONNECTED;
+            }
+            break;
+        case CONNECTION_ERROR:
+            ImGui::TextColored(
+                ImVec4(1, 0, 0, 1),
+                "Error %d",
+                m_ec.value()
+            );
+            if(ImGui::Button("OK"))
+            {
+                m_ec.clear();
+                m_status = NOT_CONNECTED;
+            }
+            break;
+        }
+    }
+    void mode_panel::server_tab()
+    {
+        static int count = 0;
+        count = ++count;
+        auto& io = ImGui::GetIO();
+
+        ImGui::InputInt("Port", &m_port);
+        switch(m_status)
+        {
+        case NOT_CONNECTED:
+            if(ImGui::Button("Accept"))
+            {
+                assert(!m_network_result.valid());
+                m_network_result = std::async(
+                    std::launch::async,
+                    [this]()
+                    {
+                        boost::system::error_code ec;
+                        m_network->accept(m_port, ec);
+                        return ec;
+                    }
+                );
+                m_status = PENDING;
+            }
+            break;
+        case CONNECTED:
+            ImGui::TextColored(ImVec4(0, 1, 0, 1), "Connected");
+            if(ImGui::Button("OK"))
+            {
+                ImGui::CloseCurrentPopup();
+            }
+            break;
+        case PENDING:
+            using namespace std;
+            ImGui::Text("%c Pending", "-\\|/"[(count / 10) % 4]);
+            if(m_network_result.wait_for(10ns) == future_status::ready)
+            {
+                m_ec = m_network_result.get();
+                m_status = m_ec ? CONNECTION_ERROR : CONNECTED;
+            }
+            break;
+        case CONNECTION_ERROR:
+            ImGui::TextColored(
+                ImVec4(1, 0, 0, 1),
+                "Error %d",
+                m_ec.value()
+            );
+            if(ImGui::Button("OK"))
+            {
+                m_ec.clear();
+                m_status = NOT_CONNECTED;
+            }
+            break;
+        }
+    }
+
+    bool ShowChatroom(const char* title, chatroom& chtrm)
+    {
+        if(!ImGui::Begin(title))
+        {
+            ImGui::End();
+            return false;
+        }
+
+        for(auto& i : chtrm.record)
+        {
+            ImGui::Text("%s", i.c_str());
+        }
+        ImGui::InputText("Input", chtrm.m_buf, sizeof(chtrm.m_buf));
+        bool result = ImGui::Button("Send");
+
+        ImGui::End();
+
+        return result;
+    }
+}
