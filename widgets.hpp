@@ -60,7 +60,22 @@ namespace awe
     public:
         chatroom();
 
-        std::vector<std::string> record;
+        enum record_type : int
+        {
+            SEND = 1,
+            RECV = 2,
+            NOTIFICATION = 3
+        };
+        struct record_t
+        {
+            std::string msg;
+            record_type type;
+
+            record_t(std::string msg_, record_type type_)
+                : msg(std::move(msg_)), type(type_) {}
+        };
+
+        std::vector<record_t> record;
 
         friend bool ShowChatroom(const char* title, chatroom& chtrm);
 
@@ -69,6 +84,11 @@ namespace awe
 
         bool ready() const { return m_ready && !get_msg().empty(); }
         void reset() { m_buf[0] = '\0'; m_ready = false; }
+
+        void add_record(std::string msg, record_type type)
+        {
+            record.emplace_back(std::move(msg), type);
+        }
 
     private:
         char m_buf[512]{};

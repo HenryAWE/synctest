@@ -151,7 +151,10 @@ int main(int argc, char* argv[])
                 network->write(msg, ec);
                 if(!ec)
                 {
-                    app.get_chatroom().record.emplace_back(msg);
+                    app.get_chatroom().add_record(
+                        std::string(msg),
+                        chatroom::SEND
+                    );
                     app.get_chatroom().reset();
                 }
             }
@@ -169,7 +172,10 @@ int main(int argc, char* argv[])
                     {
                         std::string chat_msg;
                         network->read(chat_msg, ec);
-                        app.get_chatroom().record.emplace_back(std::move(chat_msg));
+                        app.get_chatroom().add_record(
+                            std::move(chat_msg),
+                            chatroom::RECV
+                        );
                     }
                     break;
                 }

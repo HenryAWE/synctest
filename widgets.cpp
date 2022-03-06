@@ -1,5 +1,6 @@
 #include "widgets.hpp"
 #include <imgui.h>
+#include "main.hpp"
 #include "network.hpp"
 
 
@@ -75,6 +76,14 @@ namespace awe
             if(ImGui::Button("OK"))
             {
                 ImGui::CloseCurrentPopup();
+                auto remote_ep = m_network->get_socket().remote_endpoint();
+                application::instance().get_chatroom().add_record(
+                    "Connected to server " +
+                    remote_ep.address().to_string() +
+                    " on port " +
+                    std::to_string(remote_ep.port()),
+                    chatroom::NOTIFICATION
+                );
             }
             break;
         case PENDING:
@@ -130,6 +139,14 @@ namespace awe
             if(ImGui::Button("OK"))
             {
                 ImGui::CloseCurrentPopup();
+                auto remote_ep = m_network->get_socket().remote_endpoint();
+                application::instance().get_chatroom().add_record(
+                    "Accepted connection from " +
+                    remote_ep.address().to_string() +
+                    " on port " +
+                    std::to_string(remote_ep.port()),
+                    chatroom::NOTIFICATION
+                );
             }
             break;
         case PENDING:
@@ -163,21 +180,38 @@ namespace awe
 
     bool ShowChatroom(const char* title, chatroom& chtrm)
     {
-        if(!ImGui::Begin(title))
+        ImGui::SetNextWindowSize(ImVec2(400.0f, 400.0f), ImGuiCond_FirstUseEver);
+        if(!ImGui::Begin(title, nullptr, ImGuiWindowFlags_NoSavedSettings))
         {
             ImGui::End();
             return false;
         }
 
-        if(ImGui::BeginChild("texts"))
+        if(ImGui::BeginChild("texts", ImVec2(0, -24.0f), true))
         {
             for(auto& i : chtrm.record)
             {
-                ImGui::Text("%s", i.c_str());
+                switch(i.type)
+                {
+                case chatroom::SEND:
+                    ImGui::TextColored(ImVec4(0, 1, 1, 1), "SEND >>:");
+                    break;
+                case chatroom::RECV:
+                    ImGui::TextColored(ImVec4(0, 0, 1, 1), "RECV <<:");
+                    break;
+
+                default:
+                case chatroom::NOTIFICATION:
+                    ImGui::TextColored(ImVec4(1, 1, 0, 1), "[INFO] ");
+                    break;
+                }
+                ImGui::SameLine();
+                ImGui::Text("%s", i.msg.c_str());
             }
         }
         ImGui::EndChild();
         ImGui::InputText("Input", chtrm.m_buf, sizeof(chtrm.m_buf));
+        ImGui::SameLine();
         bool result = ImGui::Button("Send");
         if(result)
         {
