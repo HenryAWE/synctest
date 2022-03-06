@@ -58,6 +58,8 @@ namespace awe
     class chatroom
     {
     public:
+        chatroom();
+
         std::vector<std::string> record;
 
         friend bool ShowChatroom(const char* title, chatroom& chtrm);
@@ -65,7 +67,11 @@ namespace awe
         void clear() noexcept { std::memset(m_buf, 0, sizeof(m_buf)); }
         std::string_view get_msg() const noexcept { return m_buf; }
 
+        bool ready() const { return m_ready && !get_msg().empty(); }
+        void reset() { m_buf[0] = '\0'; m_ready = false; }
+
     private:
         char m_buf[512]{};
+        bool m_ready = false;
     };
 }

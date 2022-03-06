@@ -156,6 +156,11 @@ namespace awe
         }
     }
 
+    chatroom::chatroom()
+    {
+        reset();
+    }
+
     bool ShowChatroom(const char* title, chatroom& chtrm)
     {
         if(!ImGui::Begin(title))
@@ -164,12 +169,20 @@ namespace awe
             return false;
         }
 
-        for(auto& i : chtrm.record)
+        if(ImGui::BeginChild("texts"))
         {
-            ImGui::Text("%s", i.c_str());
+            for(auto& i : chtrm.record)
+            {
+                ImGui::Text("%s", i.c_str());
+            }
         }
+        ImGui::EndChild();
         ImGui::InputText("Input", chtrm.m_buf, sizeof(chtrm.m_buf));
         bool result = ImGui::Button("Send");
+        if(result)
+        {
+            chtrm.m_ready = true;
+        }
 
         ImGui::End();
 

@@ -9,6 +9,11 @@ namespace awe
 
     network::~network() = default;
 
+    void network::write_buf(const void* data, std::size_t len, boost::system::error_code& ec)
+    {
+        m_sock.write_some(boost::asio::buffer(data, len), ec);
+    }
+
     void network::connect(
             const boost::asio::ip::address& addr,
             unsigned short port,

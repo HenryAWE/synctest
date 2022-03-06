@@ -138,9 +138,42 @@ int main(int argc, char* argv[])
         }
 
         // Network
-        if(auto& network = app.get_network(); network)
+        if(auto& network = app.get_network(); network && network->get_socket().is_open())
         {
+            boost::system::error_code ec;
             auto& s = network->get_socket();
+
+            // Send
+            if(app.get_chatroom().ready())
+            {
+                auto msg = app.get_chatroom().get_msg();
+                network->write<int>(AWEMSG_CHAT, ec);
+                network->write(msg, ec);
+                if(!ec)
+                {
+                    app.get_chatroom().record.emplace_back(msg);
+                    app.get_chatroom().reset();
+                }
+            }
+
+            // Receive
+            while(network->get_socket().available())
+            {
+                int msgid = 0;
+                network->read<int>(msgid, ec);
+                switch(msgid)
+                {
+                case 0:
+                    break;
+                case AWEMSG_CHAT:
+                    {
+                        std::string chat_msg;
+                        network->read(chat_msg, ec);
+                        app.get_chatroom().record.emplace_back(std::move(chat_msg));
+                    }
+                    break;
+                }
+            }
         }
 
         ImGui_ImplSDL2_NewFrame(win);
