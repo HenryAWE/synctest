@@ -32,10 +32,34 @@ namespace awe
         {
             return m_started;
         }
+        void start(bool v = true) noexcept { m_started = v; }
+
+        void reset()
+        {
+            m_network->reset();
+            m_mode_panel.reset_network();
+        }
+
+        int this_player() const noexcept
+        {
+            switch(m_network->role())
+            {
+            case network::ROLE_SERVER:
+                return 0;
+            case network::ROLE_CLIENT:
+                return 1;
+            default:
+                return -1;
+            }
+        }
 
         std::shared_ptr<network>& get_network() noexcept { return m_network; }
 
         chatroom& get_chatroom() noexcept { return m_chtrm; }
+        start_panel& get_start_panel() noexcept { return m_start_panel; }
+
+        game_world* get_game_world() const noexcept { return m_game.get(); }
+        bool request_start = false;
 
     private:
         SDL_Window* m_win = nullptr;
@@ -47,5 +71,7 @@ namespace awe
 
         chatroom m_chtrm;
         mode_panel m_mode_panel;
+        start_panel m_start_panel;
+        std::unique_ptr<game_world> m_game;
     };
 }

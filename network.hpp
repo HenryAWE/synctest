@@ -99,10 +99,21 @@ namespace awe
             unsigned short port,
             boost::system::error_code& ec
         );
-        
+
+        enum network_role
+        {
+            ROLE_NONE = 0,
+            ROLE_SERVER = 1,
+            ROLE_CLIENT = 2
+        };
+
+        network_role role() const noexcept { return m_role; }
+        void reset();
+
     protected:
         boost::asio::io_service m_service;
         boost::asio::ip::tcp::acceptor m_acc;
         boost::asio::ip::tcp::socket m_sock;
+        network_role m_role = ROLE_NONE;
     };
 }

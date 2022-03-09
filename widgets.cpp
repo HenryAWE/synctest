@@ -222,4 +222,43 @@ namespace awe
 
         return result;
     }
+
+    bool ShowStartPanel(const char* title, start_panel& sp)
+    {
+        const int flags =
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoCollapse;
+        ImGui::SetNextWindowSize(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+        if(!ImGui::Begin(title, nullptr, flags))
+        {
+            ImGui::End();
+            return false;
+        }
+
+        ImGui::Text("You are %dP now", sp.m_this_id + 1);
+
+        bool start = false;
+        for(auto& [id, ready] : sp.m_status)
+        {
+            const char label[] = { char('1' + id), 'P', '\0'};
+            bool v = ready;
+            ImGui::BeginDisabled(id != sp.m_this_id);
+            ImGui::Checkbox(label, &v);
+            ImGui::SameLine();
+            ImGui::EndDisabled();
+            if(id == sp.m_this_id)
+            {
+                ready = v;
+                sp.m_changed = true;
+            }
+        }
+        bool enabled = std::all_of(sp.m_status.begin(), sp.m_status.end(), [](const auto& v) { return v.second; });
+        ImGui::BeginDisabled(!enabled);
+        start = ImGui::Button("Start");
+        ImGui::EndDisabled();
+
+        ImGui::End();
+        return start;
+    }
 }

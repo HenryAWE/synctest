@@ -23,6 +23,8 @@ namespace awe
 
         boost::asio::ip::tcp::endpoint ep(addr, port);
         m_sock.connect(ep, ec);
+        if(!ec)
+            m_role = ROLE_CLIENT;
     }
     void network::accept(
         unsigned short port,
@@ -32,5 +34,15 @@ namespace awe
         asio::ip::tcp::endpoint ep(asio::ip::address(), port);
         m_acc = asio::ip::tcp::acceptor(m_service, ep);
         m_acc.accept(m_sock, ec);
+        if(!ec)
+            m_role = ROLE_SERVER;
+    }
+
+    void network::reset()
+    {
+        m_role = ROLE_NONE;
+        m_sock.close();
+        m_acc.close();
+        m_service.reset();
     }
 }

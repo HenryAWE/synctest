@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 #include <boost/system.hpp>
 
 
@@ -93,5 +94,35 @@ namespace awe
     private:
         char m_buf[512]{};
         bool m_ready = false;
+    };
+
+    class start_panel
+    {
+    public:
+        typedef std::pair<int, bool> player_status_t;
+
+        void set(int player_id, bool ready)
+        {
+            if(player_id > 2)
+                throw std::out_of_range("player ID out of range");
+            m_status[player_id] = ready;
+        }
+        void set_this_id(int player_id)
+        {
+            m_this_id = player_id;
+        }
+        bool get(int player_id) const
+        {
+            return m_status.at(player_id);
+        }
+        bool changed() const noexcept { return m_changed; }
+        void changed(bool v) noexcept { m_changed = v; }
+
+        friend bool ShowStartPanel(const char* title, start_panel& sp);
+
+    private:
+        std::map<int, bool> m_status;
+        int m_this_id;
+        bool m_changed = false;
     };
 }
