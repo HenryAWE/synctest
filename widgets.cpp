@@ -253,12 +253,31 @@ namespace awe
                 sp.m_changed = true;
             }
         }
-        bool enabled = std::all_of(sp.m_status.begin(), sp.m_status.end(), [](const auto& v) { return v.second; });
+        bool enabled = sp.m_server && std::all_of(sp.m_status.begin(), sp.m_status.end(), [](const auto& v) { return v.second; });
         ImGui::BeginDisabled(!enabled);
         start = ImGui::Button("Start");
         ImGui::EndDisabled();
 
         ImGui::End();
         return start;
+    }
+
+    void ShowGameControl(const char* title, game_control& gc)
+    {
+        const int flags =
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_AlwaysAutoResize;
+        if(!ImGui::Begin(title, nullptr, flags))
+        {
+            ImGui::End();
+            return;
+        }
+
+        if(ImGui::Button("Stop"))
+        {
+            gc.on_stop();
+        }
+
+        ImGui::End();
     }
 }

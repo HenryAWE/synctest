@@ -39,8 +39,10 @@ namespace awe
         if(m_mode_panel.get_network_status() == mode_panel::CONNECTED)
         {
             m_start_panel.set_this_id(this_player());
+            if(m_network->role() == network::ROLE_SERVER)
+                m_start_panel.set_server();
         }
-        if(m_network->role() != network::ROLE_NONE && !started())
+        if(m_network->role() != network::ROLE_NONE && !(started() || request_start))
         {
             if(ShowStartPanel("Preparing", m_start_panel))
             {
@@ -53,6 +55,14 @@ namespace awe
         {
 
         }
+    }
+    void application::update_game()
+    {
+        if(!started())
+            return;
+        assert(m_game);
+        auto& gw = *m_game;
+        gw.update();
     }
 
     void application::report_error(
@@ -70,6 +80,17 @@ namespace awe
             msg,
             instance().window()
         );
+    }
+
+    void application::start(unsigned int seed)
+    {
+        assert(!m_game);
+        m_game = std::make_unique<game_world>(seed);
+        m_started = true;
+    }
+    void application::stop()
+    {
+        m_started = false;
     }
 }
 
@@ -146,6 +167,7 @@ int main(int argc, char* argv[])
             }
         }
 
+        bool synced = false;
         // Network
         if(auto& network = app.get_network(); network && network->role() != network::ROLE_NONE && network->get_socket().is_open())
         {
@@ -184,6 +206,23 @@ int main(int argc, char* argv[])
                     app.reset();
                 }
             }
+            if(app.request_start)
+            {
+                std::random_device dev;
+                std::uint32_t seed = dev();
+                network->write<std::int32_t>(AWEMSG_GAME_START, ec);
+                network->write<std::uint32_t>(seed, ec);
+                if(!ec)
+                {
+                    app.request_start = false;
+                    app.start(seed);
+                }
+            }
+            if(app.started())
+            {
+                network->write<std::int32_t>(AWEMSG_SYNC, ec);
+                network->write<std::uint64_t>(app.get_game_world()->framecount(), ec);
+            }
             if(ec)
                 err = true;
 
@@ -194,7 +233,13 @@ int main(int argc, char* argv[])
                 network->read<std::int32_t>(msgid, ec);
                 switch(msgid)
                 {
-                case 0:
+                case AWEMSG_SYNC:
+                    {
+                        std::uint64_t framecount;
+                        network->read(framecount, ec);
+                        if(!ec && framecount >= app.get_game_world()->framecount())
+                            synced = true;
+                    }
                     break;
                 case AWEMSG_CHAT:
                     {
@@ -215,7 +260,25 @@ int main(int argc, char* argv[])
                         app.get_start_panel().set(player_id, status);
                     }
                     break;
+                case AWEMSG_GAME_START:
+                    {
+                        assert(app.get_network()->role() != network::ROLE_SERVER);
+                        std::uint32_t seed;
+                        network->read(seed, ec);
+                        app.start(seed);
+                        synced = true;
+                    }
+                    break;
+                case AWEMSG_GAME_STOP:
+                    {
+                        app.stop();
+                        synced = true;
+                    }
+                    break;
                 }
+
+                if(synced)
+                    break;
             }
 
             if(ec)
@@ -236,6 +299,8 @@ int main(int argc, char* argv[])
         app.update_imgui();
 
         ImGui::Render();
+
+        app.update_game();
 
         SDL_RenderClear(ren);
         ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());

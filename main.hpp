@@ -5,6 +5,7 @@
 #include <imfilebrowser.h>
 #include "network.hpp"
 #include "widgets.hpp"
+#include "game.hpp"
 
 
 namespace awe
@@ -19,6 +20,7 @@ namespace awe
         void quit();
 
         void update_imgui();
+        void update_game();
 
         constexpr SDL_Window* window() const noexcept { return m_win; }
         constexpr SDL_Renderer* renderer() const noexcept { return m_ren; }
@@ -32,7 +34,8 @@ namespace awe
         {
             return m_started;
         }
-        void start(bool v = true) noexcept { m_started = v; }
+        void start(unsigned int seed);
+        void stop();
 
         void reset()
         {

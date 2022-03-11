@@ -6,6 +6,7 @@
 #include <vector>
 #include <map>
 #include <boost/system.hpp>
+#include <boost/signals2.hpp>
 
 
 namespace awe
@@ -118,11 +119,24 @@ namespace awe
         bool changed() const noexcept { return m_changed; }
         void changed(bool v) noexcept { m_changed = v; }
 
+        void set_server() { m_server = true; }
+
         friend bool ShowStartPanel(const char* title, start_panel& sp);
 
     private:
         std::map<int, bool> m_status;
         int m_this_id;
         bool m_changed = false;
+        bool m_server = false;
+    };
+
+    class game_control
+    {
+    public:
+        void ShowGameControl(const char* title, game_control& gc);
+
+        boost::signals2::signal<void()> on_stop;
+
+    private:
     };
 }
