@@ -53,6 +53,7 @@ namespace awe
         char m_ip[16];
         int m_port = 10800;
 
+        int m_mode_id = 0;
         void client_tab();
         void server_tab();
     };
@@ -130,13 +131,23 @@ namespace awe
         bool m_server = false;
     };
 
+    class game_world;
+
     class game_control
     {
     public:
-        void ShowGameControl(const char* title, game_control& gc);
+        ~game_control();
+
+        friend void ShowGameControl(const char* title, game_control& gc);
+
+        void set_game_world(std::shared_ptr<game_world> ptr)
+        {
+            m_game_world.swap(ptr);
+        }
 
         boost::signals2::signal<void()> on_stop;
 
     private:
+        std::shared_ptr<game_world> m_game_world;
     };
 }

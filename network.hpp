@@ -8,6 +8,7 @@
 #endif
 #include <boost/asio.hpp>
 #include <boost/endian.hpp>
+#include "message.hpp"
 
 
 namespace awe
@@ -90,6 +91,37 @@ namespace awe
             }
         }
 
+        template <message msgid>
+        void send_msg(const typename message_tuple<msgid>::type& msg, boost::system::error_code& ec)
+        {
+            write<std::underlying_type_t<message>>(msgid, ec);
+            if(ec)
+                return;
+            std::apply(
+                [this, &ec](auto&&... args) { (write(args, ec), ...); },
+                msg
+            );
+        }
+        void send_msg_chat(const std::tuple<std::string_view>& msg, boost::system::error_code& ec)
+        {
+            write<std::underlying_type_t<message>>(AWEMSG_CHAT, ec);
+            if(ec)
+                return;
+            write(get<0>(msg), ec);
+        }
+
+        template <message msgid>
+        message_tuple<msgid>::type recv_msg(boost::system::error_code& ec)
+        {
+            using T = message_tuple<msgid>::type;
+            T ret;
+            std::apply(
+                [this, &ec](auto&... args) {(read(args, ec), ...); },
+                ret
+            );
+            return std::move(ret);
+        }
+
         void connect(
             const boost::asio::ip::address& addr,
             unsigned short port,
@@ -99,6 +131,8 @@ namespace awe
             unsigned short port,
             boost::system::error_code& ec
         );
+        void cancel_connect();
+        void cancel_accept();
 
         enum network_role
         {

@@ -49,12 +49,13 @@ namespace awe
                 request_start = true;
             }
         }
+        if(started())
+        {
+            ShowGameControl("Game Control", m_game_control);
+        }
 
         // Chatroom
-        if(ShowChatroom("Chat", m_chtrm))
-        {
-
-        }
+        ShowChatroom("Chat", m_chtrm);
     }
     void application::update_game()
     {
@@ -85,12 +86,77 @@ namespace awe
     void application::start(unsigned int seed)
     {
         assert(!m_game);
-        m_game = std::make_unique<game_world>(seed);
+        m_game = std::make_shared<game_world>(seed);
         m_started = true;
+        m_game_control.set_game_world(m_game);
     }
     void application::stop()
     {
         m_started = false;
+        m_game_control.set_game_world(nullptr);
+        m_game.reset();
+    }
+
+    bool application::proc_msg(message msgid)
+    {
+        boost::system::error_code ec;
+        switch(msgid)
+        {
+        case AWEMSG_SYNC:
+            {
+                std::uint64_t framecount;
+                m_network->read(framecount, ec);
+                if(!ec && framecount >= get_game_world()->framecount())
+                    return true;
+            }
+            break;
+        case AWEMSG_CHAT:
+            {
+                auto msg = m_network->recv_msg<AWEMSG_CHAT>(ec);
+                if(!ec)
+                {
+                    get_chatroom().add_record(
+                        std::move(get<0>(msg)),
+                        chatroom::RECV
+                    );
+                }
+            }
+            break;
+        case AWEMSG_PLAYER_STATUS:
+            {
+                auto msg = m_network->recv_msg<AWEMSG_PLAYER_STATUS>(ec);
+                if(!ec)
+                {
+                    get_start_panel().set(get<0>(msg), get<1>(msg));
+                }
+            }
+            break;
+        case AWEMSG_GAME_START:
+            {
+                assert(m_network->role() != network::ROLE_SERVER);
+                std::uint32_t seed;
+                m_network->read(seed, ec);
+                start(seed);
+            }
+            break;
+        case AWEMSG_GAME_STOP:
+            {
+                stop();
+                return true;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    void application::network_error(boost::system::error_code ec)
+    {
+        get_chatroom().add_record(
+            "Error " + std::to_string(ec.value()),
+            chatroom::NOTIFICATION
+        );
+        reset();
     }
 }
 
@@ -179,8 +245,10 @@ int main(int argc, char* argv[])
             if(app.get_chatroom().ready())
             {
                 auto msg = app.get_chatroom().get_msg();
-                network->write<std::int32_t>(AWEMSG_CHAT, ec);
-                network->write(msg, ec);
+                network->send_msg_chat(
+                    { msg },
+                    ec
+                );
                 if(!ec)
                 {
                     app.get_chatroom().add_record(
@@ -194,9 +262,10 @@ int main(int argc, char* argv[])
             }
             if(auto& sp = app.get_start_panel(); sp.changed())
             {
-                network->write<std::int32_t>(AWEMSG_PLAYER_STATUS, ec);
-                network->write<std::int32_t>(app.this_player(), ec);
-                network->write<std::int8_t>(sp.get(app.this_player()), ec);
+                network->send_msg<AWEMSG_PLAYER_STATUS>(
+                    { app.this_player(), sp.get(app.this_player()) },
+                    ec
+                );
                 if(!ec)
                 {
                     sp.changed(false);
@@ -220,8 +289,10 @@ int main(int argc, char* argv[])
             }
             if(app.started())
             {
-                network->write<std::int32_t>(AWEMSG_SYNC, ec);
-                network->write<std::uint64_t>(app.get_game_world()->framecount(), ec);
+                network->send_msg<AWEMSG_SYNC>(
+                    { app.get_game_world()->framecount() },
+                    ec
+                );
             }
             if(ec)
                 err = true;
@@ -231,65 +302,15 @@ int main(int argc, char* argv[])
             {
                 std::int32_t msgid = 0;
                 network->read<std::int32_t>(msgid, ec);
-                switch(msgid)
-                {
-                case AWEMSG_SYNC:
-                    {
-                        std::uint64_t framecount;
-                        network->read(framecount, ec);
-                        if(!ec && framecount >= app.get_game_world()->framecount())
-                            synced = true;
-                    }
-                    break;
-                case AWEMSG_CHAT:
-                    {
-                        std::string chat_msg;
-                        network->read(chat_msg, ec);
-                        app.get_chatroom().add_record(
-                            std::move(chat_msg),
-                            chatroom::RECV
-                        );
-                    }
-                    break;
-                case AWEMSG_PLAYER_STATUS:
-                    {
-                        std::int32_t player_id;
-                        std::int8_t status;
-                        network->read(player_id, ec);
-                        network->read(status, ec);
-                        app.get_start_panel().set(player_id, status);
-                    }
-                    break;
-                case AWEMSG_GAME_START:
-                    {
-                        assert(app.get_network()->role() != network::ROLE_SERVER);
-                        std::uint32_t seed;
-                        network->read(seed, ec);
-                        app.start(seed);
-                        synced = true;
-                    }
-                    break;
-                case AWEMSG_GAME_STOP:
-                    {
-                        app.stop();
-                        synced = true;
-                    }
-                    break;
-                }
+                synced = app.proc_msg(static_cast<message>(msgid));
 
                 if(synced)
                     break;
             }
 
-            if(ec)
-                err = true;
-            if(err)
+            if(err || ec)
             {
-                app.get_chatroom().add_record(
-                    "Error " + std::to_string(ec.value()),
-                    chatroom::NOTIFICATION
-                );
-                app.reset();
+                app.network_error(ec);
             }
         }
 

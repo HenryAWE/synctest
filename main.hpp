@@ -14,6 +14,13 @@ namespace awe
     {
         application() = default;
     public:
+        enum app_status
+        {
+            MODE_SELECT = 0,
+            STARTED = 1,
+            ON_ERROR = 2
+        };
+
         static application& instance() noexcept;
 
         void init(SDL_Window* win, SDL_Renderer* ren);
@@ -41,6 +48,7 @@ namespace awe
         {
             m_network->reset();
             m_mode_panel.reset_network();
+            m_started = false;
         }
 
         int this_player() const noexcept
@@ -64,6 +72,11 @@ namespace awe
         game_world* get_game_world() const noexcept { return m_game.get(); }
         bool request_start = false;
 
+        // Return: true if successfully synchronized and program need to leave the message loop
+        bool proc_msg(message msgid);
+
+        void network_error(boost::system::error_code ec = {});
+
     private:
         SDL_Window* m_win = nullptr;
         SDL_Renderer* m_ren = nullptr;
@@ -75,6 +88,7 @@ namespace awe
         chatroom m_chtrm;
         mode_panel m_mode_panel;
         start_panel m_start_panel;
-        std::unique_ptr<game_world> m_game;
+        game_control m_game_control;
+        std::shared_ptr<game_world> m_game;
     };
 }

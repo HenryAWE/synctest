@@ -25,6 +25,8 @@ namespace awe
         m_sock.connect(ep, ec);
         if(!ec)
             m_role = ROLE_CLIENT;
+        else
+            m_sock.close();
     }
     void network::accept(
         unsigned short port,
@@ -36,6 +38,19 @@ namespace awe
         m_acc.accept(m_sock, ec);
         if(!ec)
             m_role = ROLE_SERVER;
+        else
+            m_sock.close();
+    }
+    void network::cancel_connect()
+    {
+        m_sock.cancel();
+        m_sock.close();
+    }
+    void network::cancel_accept()
+    {
+        m_acc.cancel();
+        m_acc.close();
+        m_sock.close();
     }
 
     void network::reset()

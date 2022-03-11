@@ -2,6 +2,7 @@
 #include <imgui.h>
 #include "main.hpp"
 #include "network.hpp"
+#include "game.hpp"
 
 
 namespace awe
@@ -24,23 +25,28 @@ namespace awe
         const int flags =
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_AlwaysAutoResize;
+
+        const char* const modes_name[] =
+        {
+            "Network Client",
+            "Network Server"
+        };
+        decltype(&mode_panel::server_tab) funcs[] =
+        {
+            &mode_panel::client_tab,
+            &mode_panel::server_tab
+        };
+
+        bool freeze = false;
+        if(p.get_network_status() == p.PENDING)
+            freeze = true;
         if(ImGui::BeginPopupModal(title, nullptr, flags))
         {
-            ImGui::Text("Select Your Mode");
-            if(ImGui::BeginTabBar("modes"))
-            {
-                if(ImGui::BeginTabItem("Network Client"))
-                {
-                    p.client_tab();
-                    ImGui::EndTabItem();
-                }
-                if(ImGui::BeginTabItem("Network Server"))
-                {
-                    p.server_tab();
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            }
+            ImGui::BeginDisabled(freeze);
+            ImGui::Combo("Select Your Mode", &p.m_mode_id, modes_name, std::size(modes_name));
+            ImGui::EndDisabled();
+            ImGui::Separator();
+            (p.*funcs[p.m_mode_id])();
             ImGui::EndPopup();
         }
     }
@@ -92,7 +98,23 @@ namespace awe
             if(m_network_result.wait_for(10ns) == future_status::ready)
             {
                 m_ec = m_network_result.get();
-                m_status = m_ec ? CONNECTION_ERROR : CONNECTED;
+                if(m_ec)
+                {
+                    if(m_ec.value() == boost::asio::error::interrupted || m_ec.value() == boost::asio::error::operation_aborted)
+                        m_status = NOT_CONNECTED;
+                    else
+                        m_status = CONNECTION_ERROR;
+                }
+                else
+                    m_status = CONNECTED;
+            }
+            else
+            {
+                ImGui::SameLine();
+                if(ImGui::Button("Cancel"))
+                {
+                    m_network->cancel_connect();
+                }
             }
             break;
         case CONNECTION_ERROR:
@@ -155,7 +177,23 @@ namespace awe
             if(m_network_result.wait_for(10ns) == future_status::ready)
             {
                 m_ec = m_network_result.get();
-                m_status = m_ec ? CONNECTION_ERROR : CONNECTED;
+                if(m_ec)
+                {
+                    if(m_ec.value() == boost::asio::error::interrupted || m_ec.value() == boost::asio::error::operation_aborted)
+                        m_status = NOT_CONNECTED;
+                    else
+                        m_status = CONNECTION_ERROR;
+                }
+                else
+                    m_status = CONNECTED;
+            }
+            else
+            {
+                ImGui::SameLine();
+                if(ImGui::Button("Cancel"))
+                {
+                    m_network->cancel_accept();
+                }
             }
             break;
         case CONNECTION_ERROR:
@@ -261,6 +299,8 @@ namespace awe
         ImGui::End();
         return start;
     }
+
+    game_control::~game_control() = default;
 
     void ShowGameControl(const char* title, game_control& gc)
     {
