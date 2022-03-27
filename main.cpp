@@ -68,6 +68,8 @@ namespace awe
     }
     void application::quit()
     {
+        m_mode_panel.set_network(nullptr);
+        m_network.reset();
         m_win = nullptr;
         m_ren = nullptr;
     }
@@ -129,7 +131,8 @@ namespace awe
             "Error " + std::to_string(ec.value()),
             chatroom::NOTIFICATION
         );
-        reset();
+        if(m_network)
+            reset();
     }
 
     void application::set_title_info(std::string_view info)

@@ -137,7 +137,7 @@ namespace awe
             unsigned short port,
             boost::system::error_code& ec
         );
-        void cancel_connect();
+        void cancel_connect() noexcept;
         void cancel_accept();
 
         enum network_role
@@ -168,8 +168,9 @@ namespace awe
 
         std::map<message, boost::signals2::signal<void(const message_variant&)>> m_callbacks;
 
-        std::once_flag m_launched;
+        std::atomic_bool m_launched;
         std::jthread m_msg_thread;
+        std::thread::id m_msg_thread_id;
 
         void launch_msgproc_thread();
 

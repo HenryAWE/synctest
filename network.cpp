@@ -4,13 +4,30 @@
 
 namespace awe
 {
+    namespace detailed
+    {
+        bool is_canceled(const boost::system::error_code& ec)
+        {
+            return
+                ec.value() == boost::asio::error::interrupted ||
+                ec.value() == boost::asio::error::operation_aborted;
+        }
+    }
+
     network::network()
         : m_service(1), m_acc(m_service), m_sock(m_service) {}
 
     network::~network()
     {
         assert(!m_msg_thread.joinable());
+        cancel_accept();
+        cancel_connect();
         m_msg_thread.request_stop();
+        if(m_msg_thread_id != std::this_thread::get_id())
+        {
+            while(m_launched)
+                std::this_thread::yield();
+        }
     }
 
     void network::write_buf(const void* data, std::size_t len, boost::system::error_code& ec)
@@ -30,7 +47,7 @@ namespace awe
         if(!ec)
         {
             m_role = ROLE_CLIENT;
-            std::call_once(m_launched, &network::launch_msgproc_thread, this);
+            launch_msgproc_thread();
         }
         else
             m_sock.close();
@@ -46,26 +63,36 @@ namespace awe
         if(!ec)
         {
             m_role = ROLE_SERVER;
-            std::call_once(m_launched, &network::launch_msgproc_thread, this);
+            launch_msgproc_thread();
         }
         else
             m_sock.close();
     }
-    void network::cancel_connect()
+    void network::cancel_connect() noexcept
     {
-        m_sock.cancel();
-        m_sock.close();
+        boost::system::error_code ec;
+        m_sock.cancel(ec);
+        m_sock.close(ec);
     }
     void network::cancel_accept()
     {
-        m_acc.cancel();
-        m_acc.close();
-        m_sock.close();
+        boost::system::error_code ec;
+        m_acc.cancel(ec);
+        m_acc.close(ec);
+        m_sock.close(ec);
     }
 
     void network::reset()
     {
         m_role = ROLE_NONE;
+        cancel_accept();
+        cancel_connect();
+        m_msg_thread.request_stop();
+        if(m_msg_thread_id != std::this_thread::get_id())
+        {
+            while(m_launched)
+                std::this_thread::yield();
+        }
         m_sock.close();
         m_acc.close();
         m_service.reset();
@@ -73,6 +100,12 @@ namespace awe
 
     void network::launch_msgproc_thread()
     {
+        if(m_launched)
+        {
+            assert(false);
+            return;
+        }
+        m_launched = true;
         m_msg_thread = std::jthread(
             std::bind(&network::msgproc_main, this, std::placeholders::_1)
         );
@@ -81,20 +114,17 @@ namespace awe
 
     void network::msgproc_main(std::stop_token stop)
     {
-        boost::system::error_code ec;
-        while(!stop.stop_requested())
+        m_msg_thread_id = std::this_thread::get_id();
+        try
         {
-            if(m_sock.is_open() && m_sock.available(ec))
+            boost::system::error_code ec;
+            while(!stop.stop_requested() && m_sock.is_open())
             {
-                if(ec) // Error code of m_sock.available(ec)
-                {
-                    on_error(ec);
-                    ec.clear();
-                    continue;
-                }
                 std::int32_t msgid = 0;
                 read<std::int32_t>(msgid, ec);
-                if(ec)
+                if(detailed::is_canceled(ec))
+                    break;
+                else if(ec)
                 {
                     on_error(ec);
                     ec.clear();
@@ -103,6 +133,9 @@ namespace awe
                 proc_msg(static_cast<message>(msgid), ec);
             }
         }
+        catch(...) {}
+
+        m_launched = false;
     }
     void network::proc_msg(message msgid, boost::system::error_code& ec)
     {

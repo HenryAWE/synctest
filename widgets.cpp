@@ -15,6 +15,8 @@ namespace awe
     void mode_panel::set_network(std::shared_ptr<network> ptr)
     {
         m_network.swap(ptr);
+        if(!m_network)
+            return;
         m_status = m_network->get_socket().is_open() ?
             CONNECTED :
             NOT_CONNECTED;
