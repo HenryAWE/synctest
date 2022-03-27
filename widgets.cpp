@@ -23,26 +23,30 @@ namespace awe
     void ShowModePanel(const char* title, mode_panel& p)
     {
         const int flags =
+            ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_AlwaysAutoResize;
 
         const char* const modes_name[] =
         {
+            "Local Single Player",
+            "Local Double Player",
+            "Replay",
             "Network Client",
             "Network Server"
         };
         decltype(&mode_panel::server_tab) funcs[] =
         {
+            &mode_panel::local_single_tab,
+            &mode_panel::local_double_tab,
+            &mode_panel::replay_tab,
             &mode_panel::client_tab,
             &mode_panel::server_tab
         };
 
-        bool freeze = false;
-        if(p.get_network_status() == p.PENDING)
-            freeze = true;
         if(ImGui::BeginPopupModal(title, nullptr, flags))
         {
-            ImGui::BeginDisabled(freeze);
+            ImGui::BeginDisabled(p.freeze_ui());
             ImGui::Combo("Select Your Mode", &p.m_mode_id, modes_name, std::size(modes_name));
             ImGui::EndDisabled();
             ImGui::Separator();
@@ -51,14 +55,32 @@ namespace awe
         }
     }
 
+    void mode_panel::local_single_tab()
+    {
+
+    }
+    void mode_panel::local_double_tab()
+    {
+        ImGui::Text("1P: WASD\n2P: Arrow Keys");
+        if(ImGui::Button("Start"))
+        {
+            
+        }
+    }
+    void mode_panel::replay_tab()
+    {
+
+    }
     void mode_panel::client_tab()
     {
         static int count = 0;
         count = ++count;
         auto& io = ImGui::GetIO();
 
+        ImGui::BeginDisabled(freeze_ui());
         ImGui::InputText("IP", m_ip, 16);
         ImGui::InputInt("Port", &m_port);
+        ImGui::EndDisabled();
         switch(m_status)
         {
         case NOT_CONNECTED:
@@ -70,7 +92,10 @@ namespace awe
                     [this]()
                     {
                         boost::system::error_code ec;
-                        m_network->connect(boost::asio::ip::address_v4::from_string(m_ip), m_port, ec);
+                        auto addr = boost::asio::ip::address_v4::from_string(m_ip, ec);
+                        if(ec)
+                            return ec;
+                        m_network->connect(addr, m_port, ec);
                         return ec;
                     }
                 );
@@ -90,6 +115,7 @@ namespace awe
                     std::to_string(remote_ep.port()),
                     chatroom::NOTIFICATION
                 );
+                application::instance().set_title_info("client");
             }
             break;
         case PENDING:
@@ -137,7 +163,9 @@ namespace awe
         count = ++count;
         auto& io = ImGui::GetIO();
 
+        ImGui::BeginDisabled(freeze_ui());
         ImGui::InputInt("Port", &m_port);
+        ImGui::EndDisabled();
         switch(m_status)
         {
         case NOT_CONNECTED:
@@ -169,6 +197,7 @@ namespace awe
                     std::to_string(remote_ep.port()),
                     chatroom::NOTIFICATION
                 );
+                application::instance().set_title_info("server");
             }
             break;
         case PENDING:
@@ -211,6 +240,11 @@ namespace awe
         }
     }
 
+    bool mode_panel::freeze_ui() const noexcept
+    {
+        return m_status != NOT_CONNECTED;
+    }
+
     chatroom::chatroom()
     {
         reset();
@@ -227,6 +261,7 @@ namespace awe
 
         if(ImGui::BeginChild("texts", ImVec2(0, -24.0f), true))
         {
+            std::lock_guard guard(chtrm.get_mutex());
             for(auto& i : chtrm.record)
             {
                 switch(i.type)
@@ -251,9 +286,16 @@ namespace awe
         ImGui::InputText("Input", chtrm.m_buf, sizeof(chtrm.m_buf));
         ImGui::SameLine();
         bool result = ImGui::Button("Send");
-        if(result)
+        if(result && !chtrm.get_msg().empty())
         {
-            chtrm.m_ready = true;
+            if(chtrm.on_send(chtrm.get_msg()))
+            {
+                chtrm.add_record(
+                    std::string(chtrm.get_msg()),
+                    chtrm.SEND
+                );
+                chtrm.clear();
+            }
         }
 
         ImGui::End();
@@ -277,6 +319,7 @@ namespace awe
         ImGui::Text("You are %dP now", sp.m_this_id + 1);
 
         bool start = false;
+        std::lock_guard guard(sp.get_mutex());
         for(auto& [id, ready] : sp.m_status)
         {
             const char label[] = { char('1' + id), 'P', '\0'};
@@ -287,8 +330,8 @@ namespace awe
             ImGui::EndDisabled();
             if(id == sp.m_this_id)
             {
-                ready = v;
-                sp.m_changed = true;
+                if(sp.on_change(id, v))
+                    ready = v;
             }
         }
         bool enabled = sp.m_server && std::all_of(sp.m_status.begin(), sp.m_status.end(), [](const auto& v) { return v.second; });
@@ -319,5 +362,11 @@ namespace awe
         }
 
         ImGui::End();
+    }
+
+    start_panel::start_panel()
+    {
+        set(0, false);
+        set(1, false);
     }
 }

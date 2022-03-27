@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <future>
 #include <memory>
 #include <string>
@@ -16,6 +17,15 @@ namespace awe
     class mode_panel
     {
     public:
+        enum mode
+        {
+            MODE_NONE = 0,
+            MODE_LOCAL_SINGLE_PLAYER = 1,
+            MODE_LOCAL_DOUBLE_PLAYER = 2,
+            MODE_REPLAY,
+            MODE_NETWORK,
+        };
+
         mode_panel();
 
         void set_network(std::shared_ptr<network> ptr);
@@ -42,6 +52,11 @@ namespace awe
             m_ec.clear();
         }
 
+        mode get_mode() const
+        {
+            return m_mode;
+        }
+
     private:
         std::shared_ptr<network> m_network;
         std::future<boost::system::error_code> m_network_result;
@@ -54,8 +69,14 @@ namespace awe
         int m_port = 10800;
 
         int m_mode_id = 0;
+        mode m_mode = MODE_NONE;
+        void local_single_tab();
+        void local_double_tab();
+        void replay_tab();
         void client_tab();
         void server_tab();
+
+        bool freeze_ui() const noexcept;
     };
 
     class chatroom
@@ -85,23 +106,28 @@ namespace awe
         void clear() noexcept { std::memset(m_buf, 0, sizeof(m_buf)); }
         std::string_view get_msg() const noexcept { return m_buf; }
 
-        bool ready() const { return m_ready && !get_msg().empty(); }
-        void reset() { m_buf[0] = '\0'; m_ready = false; }
+        void reset() { m_buf[0] = '\0'; }
 
         void add_record(std::string msg, record_type type)
         {
             record.emplace_back(std::move(msg), type);
         }
 
+        constexpr std::mutex& get_mutex() noexcept { return m_mutex; }
+
+        boost::signals2::signal<bool(std::string_view)> on_send;
+
     private:
+        std::mutex m_mutex;
         char m_buf[512]{};
-        bool m_ready = false;
     };
 
     class start_panel
     {
     public:
         typedef std::pair<int, bool> player_status_t;
+
+        start_panel();
 
         void set(int player_id, bool ready)
         {
@@ -117,17 +143,19 @@ namespace awe
         {
             return m_status.at(player_id);
         }
-        bool changed() const noexcept { return m_changed; }
-        void changed(bool v) noexcept { m_changed = v; }
 
         void set_server() { m_server = true; }
 
         friend bool ShowStartPanel(const char* title, start_panel& sp);
 
+        constexpr std::mutex& get_mutex() noexcept { return m_mutex; }
+
+        boost::signals2::signal<bool(int, bool)> on_change;
+
     private:
+        std::mutex m_mutex;
         std::map<int, bool> m_status;
         int m_this_id;
-        bool m_changed = false;
         bool m_server = false;
     };
 

@@ -15,7 +15,7 @@ add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 # Make sure macro "__cplusplus" is correctly defined on MSVC
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/Zc:__cplusplus>")
 
-project(sdltemplate)
+project(Kairos)
 
 find_package(SDL2 REQUIRED)
 find_package(Threads REQUIRED)
@@ -23,14 +23,14 @@ find_package(Boost REQUIRED COMPONENTS system)
 add_subdirectory(imgui)
 add_subdirectory(stb)
 
-aux_source_directory(. sdltemplate_src)
+aux_source_directory(. kairos_src)
 
-add_executable(sdlapp WIN32 ${sdltemplate_src})
+add_executable(kairos WIN32 ${kairos_src})
 
-target_compile_definitions(sdlapp PUBLIC BOOST_ASIO_SEPARATE_COMPILATION)
+target_compile_definitions(kairos PUBLIC BOOST_ASIO_SEPARATE_COMPILATION)
 
-target_link_libraries(sdlapp PRIVATE SDL2::SDL2 SDL2::SDL2main)
-target_link_libraries(sdlapp PRIVATE Threads::Threads)
-target_link_libraries(sdlapp PRIVATE Boost::system)
-target_link_libraries(sdlapp PRIVATE imgui)
-target_link_libraries(sdlapp PRIVATE stb)
+target_link_libraries(kairos PRIVATE SDL2::SDL2 SDL2::SDL2main)
+target_link_libraries(kairos PRIVATE Threads::Threads)
+target_link_libraries(kairos PRIVATE Boost::system)
+target_link_libraries(kairos PRIVATE imgui)
+target_link_libraries(kairos PRIVATE stb)

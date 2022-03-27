@@ -4,8 +4,9 @@
 #include <imgui.h>
 #include <imfilebrowser.h>
 #include "network.hpp"
+#include "input.hpp"
 #include "widgets.hpp"
-#include "game.hpp"
+#include "runner.hpp"
 
 
 namespace awe
@@ -39,16 +40,21 @@ namespace awe
 
         bool started() const
         {
-            return m_started;
+            return m_status == STARTED;
         }
-        void start(unsigned int seed);
-        void stop();
+        void start(std::shared_ptr<runner> r)
+        {
+            m_runner.swap(r);
+            m_status = STARTED;
+        }
 
         void reset()
         {
             m_network->reset();
             m_mode_panel.reset_network();
-            m_started = false;
+            m_runner.reset();
+            m_status = MODE_SELECT;
+            clear_title_info();
         }
 
         int this_player() const noexcept
@@ -69,26 +75,36 @@ namespace awe
         chatroom& get_chatroom() noexcept { return m_chtrm; }
         start_panel& get_start_panel() noexcept { return m_start_panel; }
 
-        game_world* get_game_world() const noexcept { return m_game.get(); }
-        bool request_start = false;
+        constexpr std::shared_ptr<runner>& get_runner() noexcept
+        {
+            return m_runner;
+        }
+        constexpr input_manager& get_input_manager() noexcept { return m_input; }
 
-        // Return: true if successfully synchronized and program need to leave the message loop
-        bool proc_msg(message msgid);
+        void network_error(const boost::system::error_code& ec = {});
 
-        void network_error(boost::system::error_code ec = {});
+        void set_title_info(std::string_view info);
+        void clear_title_info() { set_title_info(std::string_view()); }
+
+        constexpr std::mutex& get_mutex() noexcept { return m_mutex; }
 
     private:
         SDL_Window* m_win = nullptr;
         SDL_Renderer* m_ren = nullptr;
+        app_status m_status;
+        std::mutex m_mutex;
+
+        void transit(app_status st);
 
         // Network
         std::shared_ptr<network> m_network;
-        bool m_started = false;
 
         chatroom m_chtrm;
         mode_panel m_mode_panel;
         start_panel m_start_panel;
         game_control m_game_control;
-        std::shared_ptr<game_world> m_game;
+
+        std::shared_ptr<runner> m_runner;
+        input_manager m_input;
     };
 }

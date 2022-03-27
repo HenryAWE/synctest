@@ -13,8 +13,7 @@ namespace awe
         m_framecount += 1;
     }
 
-    void render(SDL_Renderer* ren)
+    void game_world::render(SDL_Renderer* ren)
     {
-        
     }
 }

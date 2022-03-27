@@ -1,13 +1,17 @@
 #pragma once
 
 #include <cstddef>
+#include <atomic>
 #include <type_traits>
+#include <thread>
 #include <future>
+#include <map>
 #ifdef _WIN32
 #   include <sdkddkver.h>
 #endif
 #include <boost/asio.hpp>
 #include <boost/endian.hpp>
+#include <boost/signals2.hpp>
 #include "message.hpp"
 
 
@@ -21,6 +25,8 @@ namespace awe
         virtual ~network();
 
         boost::asio::ip::tcp::socket& get_socket() { return m_sock; }
+
+        constexpr std::mutex& get_write_mutex() noexcept { return m_write_mutex; }
 
         template <typename T>
         void write(const T& val, boost::system::error_code& ec)
@@ -144,10 +150,30 @@ namespace awe
         network_role role() const noexcept { return m_role; }
         void reset();
 
+        template <message MsgId, typename Func>
+        auto register_msgproc(Func&& func)
+        {
+            return m_callbacks[MsgId].connect([f = std::forward<Func>(func)](const message_variant& msg) mutable {
+                f(std::get<static_cast<std::size_t>(MsgId)>(msg));
+            });
+        }
+        boost::signals2::signal<void(const boost::system::error_code&)> on_error;
+
     protected:
         boost::asio::io_service m_service;
         boost::asio::ip::tcp::acceptor m_acc;
         boost::asio::ip::tcp::socket m_sock;
         network_role m_role = ROLE_NONE;
+        std::mutex m_write_mutex;
+
+        std::map<message, boost::signals2::signal<void(const message_variant&)>> m_callbacks;
+
+        std::once_flag m_launched;
+        std::jthread m_msg_thread;
+
+        void launch_msgproc_thread();
+
+        void msgproc_main(std::stop_token stop);
+        void proc_msg(message msgid, boost::system::error_code& ec);
     };
 }

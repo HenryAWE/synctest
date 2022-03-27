@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <tuple>
+#include <variant>
 
 
 namespace awe
@@ -45,4 +46,12 @@ namespace awe
     {
         using type = std::tuple<>;
     };
+
+    typedef std::variant<
+        message_tuple<AWEMSG_SYNC>::type,
+        message_tuple<AWEMSG_CHAT>::type,
+        message_tuple<AWEMSG_PLAYER_STATUS>::type,
+        message_tuple<AWEMSG_GAME_START>::type,
+        message_tuple<AWEMSG_GAME_STOP>::type
+    > message_variant;
 }
