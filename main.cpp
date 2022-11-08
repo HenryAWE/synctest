@@ -65,6 +65,10 @@ namespace awe
                 net.on_error(ec);
             return !ec;
         });
+
+        m_game_control.on_stop.connect(
+            std::bind(&application::reset, this)
+        );
     }
     void application::quit()
     {
@@ -78,20 +82,20 @@ namespace awe
     {
         auto& io = ImGui::GetIO();
 
-        if(!m_mode_panel.selected())
-            ImGui::OpenPopup("Mode Select");
-        ShowModePanel("Mode Select", m_mode_panel);
-        if(m_mode_panel.get_network_status() == mode_panel::CONNECTED)
+        if(m_status == MODE_SELECT)
         {
-            m_start_panel.set_this_id(this_player());
-            if(m_network->role() == network::ROLE_SERVER)
-                m_start_panel.set_server();
-        }
-        if(m_network->role() != network::ROLE_NONE && !started())
-        {
-            if(ShowStartPanel("Preparing", m_start_panel))
+            if(!m_mode_panel.selected())
+                ImGui::OpenPopup("Mode Select");
+            ShowModePanel("Mode Select", m_mode_panel);
+            if(m_mode_panel.get_network_status() == mode_panel::CONNECTED)
             {
-                
+                m_start_panel.set_this_id(this_player());
+                if(m_network->role() == network::ROLE_SERVER)
+                    m_start_panel.set_server();
+            }
+            if(m_network->role() != network::ROLE_NONE)
+            {
+                ShowStartPanel("Preparing", m_start_panel);
             }
         }
         if(started())
@@ -100,7 +104,8 @@ namespace awe
         }
 
         // Chatroom
-        ShowChatroom("Chat", m_chtrm);
+        if(m_network->role() != m_network->ROLE_NONE)
+            ShowChatroom("Chat", m_chtrm);
     }
     void application::update_game()
     {
@@ -149,6 +154,7 @@ namespace awe
 
     void application::transit(app_status st)
     {
+        m_status = st;
     }
 }
 

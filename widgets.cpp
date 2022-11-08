@@ -66,7 +66,10 @@ namespace awe
         ImGui::Text("1P: WASD\n2P: Arrow Keys");
         if(ImGui::Button("Start"))
         {
-            
+            application::instance().start(
+                std::make_shared<local_multi_runner>()
+            );
+            ImGui::CloseCurrentPopup();
         }
     }
     void mode_panel::replay_tab()
@@ -351,12 +354,18 @@ namespace awe
     {
         const int flags =
             ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_AlwaysAutoResize;
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
         if(!ImGui::Begin(title, nullptr, flags))
         {
             ImGui::End();
             return;
         }
+
+        auto& io = ImGui::GetIO();
+        ImGui::Text("Framecount: %u", (unsigned int)gc.m_game_world->framecount());
+        ImGui::Text("FPS: %.1f", io.Framerate);
 
         if(ImGui::Button("Stop"))
         {

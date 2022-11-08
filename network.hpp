@@ -55,7 +55,7 @@ namespace awe
             }
             else
             {
-                static_assert(false, "Error");
+                static_assert(!sizeof(T), "Error");
             }
         }
         void write(std::string_view view, boost::system::error_code& ec)
@@ -93,7 +93,7 @@ namespace awe
             }
             else
             {
-                static_assert(false, "Error");
+                static_assert(!sizeof(T), "Error");
             }
         }
 

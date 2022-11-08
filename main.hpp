@@ -44,17 +44,20 @@ namespace awe
         }
         void start(std::shared_ptr<runner> r)
         {
+            assert(r);
             m_runner.swap(r);
-            m_status = STARTED;
+            m_game_control.set_game_world(m_runner->game());
+            transit(STARTED);
         }
 
         void reset()
         {
+            m_game_control.set_game_world(nullptr);
             m_network->reset();
             m_mode_panel.reset_network();
             m_runner.reset();
-            m_status = MODE_SELECT;
             clear_title_info();
+            transit(MODE_SELECT);
         }
 
         int this_player() const noexcept

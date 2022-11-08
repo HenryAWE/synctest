@@ -1,2 +1,3 @@
-# Synctest
-Network synchronization test
+# Synctest / Kairos' Constancy
+Network synchronization test & Replay test
+
