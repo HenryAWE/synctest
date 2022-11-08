@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 #include <map>
 #include <boost/system.hpp>
 #include <boost/signals2.hpp>
@@ -63,6 +64,7 @@ namespace awe
         boost::system::error_code m_ec;
         network_status m_status;
         std::string m_error_msg;
+        std::optional<std::string> m_app_info;
 
         // Cache
         char m_ip[16];
@@ -75,8 +77,12 @@ namespace awe
         void replay_tab();
         void client_tab();
         void server_tab();
+        void settings_tab();
+        void about_tab();
 
         bool freeze_ui() const noexcept;
+
+        void build_app_info();
     };
 
     class chatroom

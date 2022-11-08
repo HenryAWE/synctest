@@ -35,7 +35,10 @@ namespace awe
             "Local Double Player",
             "Replay",
             "Network Client",
-            "Network Server"
+            "Network Server",
+            "Settings",
+            "About",
+            "Quit"
         };
         decltype(&mode_panel::server_tab) funcs[] =
         {
@@ -43,7 +46,9 @@ namespace awe
             &mode_panel::local_double_tab,
             &mode_panel::replay_tab,
             &mode_panel::client_tab,
-            &mode_panel::server_tab
+            &mode_panel::server_tab,
+            &mode_panel::settings_tab,
+            &mode_panel::about_tab
         };
 
         if(ImGui::BeginPopupModal(title, nullptr, flags))
@@ -52,7 +57,12 @@ namespace awe
             ImGui::Combo("Select Your Mode", &p.m_mode_id, modes_name, std::size(modes_name));
             ImGui::EndDisabled();
             ImGui::Separator();
-            (p.*funcs[p.m_mode_id])();
+            if(p.m_mode_id == std::size(funcs))
+            {
+                application::instance().quit();
+            }
+            else
+                (p.*funcs[p.m_mode_id])();
             ImGui::EndPopup();
         }
     }
@@ -244,10 +254,71 @@ namespace awe
             break;
         }
     }
+    void mode_panel::settings_tab()
+    {
+
+    }
+    void mode_panel::about_tab()
+    {
+        if(!m_app_info.has_value())
+            build_app_info();
+        const auto& str = *m_app_info;
+
+        ImGui::TextUnformatted(
+            std::to_address(str.begin()),
+            std::to_address(str.end())
+        );
+    }
 
     bool mode_panel::freeze_ui() const noexcept
     {
         return m_status != NOT_CONNECTED;
+    }
+
+    void mode_panel::build_app_info()
+    {
+        std::stringstream ss;
+        ss << std::format(
+            "Compiler: {}\n"
+            "Standard Library: {}\n",
+            BOOST_COMPILER,
+            BOOST_STDLIB
+        );
+        ss << "__cplusplus: " << __cplusplus << "L\n";
+#ifdef _DEBUG
+        ss << "_DEBUG: " << _DEBUG << std::endl;
+#endif
+
+        SDL_version sdl_ver{};
+        SDL_VERSION(&sdl_ver);
+        ss << std::format(
+            "SDL Version: {}.{}.{}\n",
+            sdl_ver.major,
+            sdl_ver.minor,
+            sdl_ver.patch
+        );
+        SDL_GetVersion(&sdl_ver);
+        ss << std::format(
+            "SDL Version (Runtime): {}.{}.{}\n",
+            sdl_ver.major,
+            sdl_ver.minor,
+            sdl_ver.patch
+        );
+
+        ss << std::format(
+            "Boost Version {}.{}.{} ({})\n",
+            BOOST_VERSION / 100000,
+            BOOST_VERSION % 10000 / 100,
+            BOOST_VERSION % 100,
+            BOOST_VERSION
+        );
+
+        ss << std::format(
+            "ImGui Version: {} ({})",
+            IMGUI_VERSION, IMGUI_VERSION_NUM
+        );
+
+        m_app_info = std::move(ss).str();
     }
 
     chatroom::chatroom()
