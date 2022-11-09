@@ -6,7 +6,7 @@ namespace awe
 {
     namespace detailed
     {
-        bool is_canceled(const boost::system::error_code& ec)
+        static bool is_canceled(const boost::system::error_code& ec) noexcept
         {
             return
                 ec.value() == boost::asio::error::interrupted ||
