@@ -256,7 +256,18 @@ namespace awe
     }
     void mode_panel::settings_tab()
     {
-
+        ImGui::BulletText("Input");
+        auto& im = application::instance().get_input_manager();
+        ImGui::Text("Key");
+        for(int i = 0; i < (int)input_key::end; ++i)
+        {
+            auto k = static_cast<input_key>(i);
+            ImGui::Text(
+                "%s - %s",
+                im.get_key_name(k),
+                SDL_GetKeyName(im.get_keycode(k))
+            );
+        }
     }
     void mode_panel::about_tab()
     {

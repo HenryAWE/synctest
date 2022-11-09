@@ -9,6 +9,7 @@
 #include <map>
 #include <boost/system.hpp>
 #include <boost/signals2.hpp>
+#include "input.hpp"
 
 
 namespace awe
