@@ -1,4 +1,5 @@
 #include "widgets.hpp"
+#include <boost/locale.hpp>
 #include <imgui.h>
 #include "main.hpp"
 #include "network.hpp"
@@ -7,6 +8,23 @@
 
 namespace awe
 {
+    namespace detail
+    {
+        std::string get_ec_message(const boost::system::error_code& ec)
+        {
+#ifdef _WIN32
+            boost::locale::generator gen;
+            auto loc = gen(boost::locale::util::get_system_locale());
+            return boost::locale::conv::to_utf<char>(
+                ec.message(),
+                loc
+            );
+#else
+            return ec.message();
+#endif
+        }
+    }
+
     mode_panel::mode_panel()
     {
         std::memcpy(m_ip, "127.0.0.1", 10);
@@ -24,6 +42,8 @@ namespace awe
 
     void ShowModePanel(const char* title, mode_panel& p)
     {
+        auto& io = ImGui::GetIO();
+
         const int flags =
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoSavedSettings |
@@ -51,6 +71,11 @@ namespace awe
             &mode_panel::about_tab
         };
 
+        ImGui::SetNextWindowPos(
+            ImVec2(io.DisplaySize.x / 2.0f, io.DisplaySize.y * 0.2f),
+            ImGuiCond_Always,
+            ImVec2(0.5f, 0.0f)
+        );
         if(ImGui::BeginPopupModal(title, nullptr, flags))
         {
             ImGui::BeginDisabled(p.freeze_ui());
@@ -73,7 +98,7 @@ namespace awe
     }
     void mode_panel::local_double_tab()
     {
-        ImGui::Text("1P: WASD\n2P: Arrow Keys");
+        ImGui::Text("1P: WASD\n2P: Arrow Keys\n (See Settings)");
         if(ImGui::Button("Start"))
         {
             application::instance().start(
@@ -144,7 +169,10 @@ namespace awe
                     if(m_ec.value() == boost::asio::error::interrupted || m_ec.value() == boost::asio::error::operation_aborted)
                         m_status = NOT_CONNECTED;
                     else
+                    {
                         m_status = CONNECTION_ERROR;
+                        m_error_msg = detail::get_ec_message(m_ec);
+                    }
                 }
                 else
                     m_status = CONNECTED;
@@ -161,11 +189,14 @@ namespace awe
         case CONNECTION_ERROR:
             ImGui::TextColored(
                 ImVec4(1, 0, 0, 1),
-                "Error %d",
+                "Error: %s (%d, 0x%X)",
+                m_error_msg.c_str(),
+                m_ec.value(),
                 m_ec.value()
             );
             if(ImGui::Button("OK"))
             {
+                m_error_msg.clear();
                 m_ec.clear();
                 m_status = NOT_CONNECTED;
             }
@@ -226,7 +257,10 @@ namespace awe
                     if(m_ec.value() == boost::asio::error::interrupted || m_ec.value() == boost::asio::error::operation_aborted)
                         m_status = NOT_CONNECTED;
                     else
+                    {
                         m_status = CONNECTION_ERROR;
+                        m_error_msg = detail::get_ec_message(m_ec);
+                    }
                 }
                 else
                     m_status = CONNECTED;
@@ -243,11 +277,14 @@ namespace awe
         case CONNECTION_ERROR:
             ImGui::TextColored(
                 ImVec4(1, 0, 0, 1),
-                "Error %d",
+                "Error: %s (%d, 0x%X)",
+                m_error_msg.c_str(),
+                m_ec.value(),
                 m_ec.value()
             );
             if(ImGui::Button("OK"))
             {
+                m_error_msg.clear();
                 m_ec.clear();
                 m_status = NOT_CONNECTED;
             }
@@ -256,18 +293,33 @@ namespace awe
     }
     void mode_panel::settings_tab()
     {
-        ImGui::BulletText("Input");
-        auto& im = application::instance().get_input_manager();
-        ImGui::Text("Key");
-        for(int i = 0; i < (int)input_key::end; ++i)
+        if(!ImGui::BeginChild("#settings", ImVec2(0, ImGui::GetIO().DisplaySize.y * 0.4f)))
         {
-            auto k = static_cast<input_key>(i);
-            ImGui::Text(
-                "%s - %s",
-                im.get_key_name(k),
-                SDL_GetKeyName(im.get_keycode(k))
-            );
+            ImGui::EndChild();
+            return;
         }
+        if(ImGui::TreeNodeEx("Input", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            auto& im = application::instance().get_input_manager();
+            if(ImGui::TreeNodeEx("Key", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                for(int i = 0; i < (int)input_key::end; ++i)
+                {
+                    auto k = static_cast<input_key>(i);
+                    ImGui::Text(
+                        "%s - %s",
+                        im.get_key_name(k),
+                        SDL_GetKeyName(im.get_keycode(k))
+                    );
+                }
+
+                ImGui::TreePop();
+            }
+
+            ImGui::TreePop();
+        }
+
+        ImGui::EndChild();
     }
     void mode_panel::about_tab()
     {
@@ -275,10 +327,14 @@ namespace awe
             build_app_info();
         const auto& str = *m_app_info;
 
-        ImGui::TextUnformatted(
-            std::to_address(str.begin()),
-            std::to_address(str.end())
-        );
+        if(ImGui::BeginChild("#settings", ImVec2(0, ImGui::GetIO().DisplaySize.y * 0.4f)))
+        {
+            ImGui::TextUnformatted(
+                std::to_address(str.begin()),
+                std::to_address(str.end())
+            );
+        }
+        ImGui::EndChild();
     }
 
     bool mode_panel::freeze_ui() const noexcept
@@ -325,8 +381,19 @@ namespace awe
         );
 
         ss << std::format(
-            "ImGui Version: {} ({})",
+            "ImGui Version: {} ({})\n",
             IMGUI_VERSION, IMGUI_VERSION_NUM
+        );
+
+        auto* ren = application::instance().renderer();
+        SDL_RendererInfo ren_info{};
+        SDL_GetRendererInfo(ren, &ren_info);
+        ss << std::format(
+            "Renderer\n"
+            "  name: {}\n"
+            "  max texture size: {} x {}",
+            ren_info.name,
+            ren_info.max_texture_width, ren_info.max_texture_height
         );
 
         m_app_info = std::move(ss).str();

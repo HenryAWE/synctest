@@ -19,7 +19,7 @@ project(Kairos)
 
 find_package(SDL2 REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost REQUIRED COMPONENTS system)
+find_package(Boost REQUIRED COMPONENTS system locale)
 add_subdirectory(imgui)
 add_subdirectory(stb)
 
@@ -31,6 +31,6 @@ target_compile_definitions(kairos PUBLIC BOOST_ASIO_SEPARATE_COMPILATION)
 
 target_link_libraries(kairos PRIVATE SDL2::SDL2 SDL2::SDL2main)
 target_link_libraries(kairos PRIVATE Threads::Threads)
-target_link_libraries(kairos PRIVATE Boost::system)
+target_link_libraries(kairos PRIVATE Boost::system Boost::locale)
 target_link_libraries(kairos PRIVATE imgui)
 target_link_libraries(kairos PRIVATE stb)
