@@ -1,4 +1,5 @@
 #include "main.hpp"
+#include <filesystem>
 #include <boost/endian.hpp>
 #include <imgui.h>
 #include <imgui_impl_sdl.h>
@@ -199,6 +200,21 @@ int main(int argc, char* argv[])
     SDL_RenderSetVSync(ren, 1);
 
     ImGuiContext* imctx = ImGui::CreateContext();
+    auto* imfonts = ImGui::GetIO().Fonts;
+    if(std::filesystem::exists("SourceHanSansHWSC-Regular.otf"))
+    {
+        imfonts->AddFontFromFileTTF(
+            "SourceHanSansHWSC-Regular.otf",
+            24.0f,
+            nullptr,
+            imfonts->GetGlyphRangesChineseSimplifiedCommon()
+        );
+    }
+    else
+    {
+        imfonts->AddFontDefault();
+    }
+    
     ImGui_ImplSDL2_InitForSDLRenderer(win, ren);
     ImGui_ImplSDLRenderer_Init(ren);
     ImGui_ImplSDLRenderer_CreateDeviceObjects();
